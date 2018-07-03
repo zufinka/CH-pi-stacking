@@ -63,7 +63,7 @@ void Main()
 	{
 		var str = StructureReader.Read(e).Structure;
 		
-		//HIS řazení: N, ND1, NE2, O
+		//HIS řazení: N, ND1, NE2, O !! pozor na řazení více HIS (N, N, ND1, ND1, NE2, NE2, O, O)
         /*
             varianty proměnné sorted, podle toho, s čím aktuálně potřebuju pracovat
          */
@@ -74,9 +74,11 @@ void Main()
 		
         /*
             projdu případy, kdy se našly motivy s aromatickou amk v blízkosti cukru
-            aromatická amk bude nalezená vždy!!!
+            aromatická amk bude nalezená vždy!!! (možná už bezpředmětná podmínka, z historických důvodů ponechána)
          */
-		if (sorted.Count > 4) //závisí na počtu atomů arom. residua, které ukládám
+		var pocetAtomuJedneAMK = 4;
+		var pocetAtomuAMK = pocetAtomuJedneAMK; //zkontrolovat, jestli jsem ji začala používat všude, kde to číslo používám
+		if (sorted.Count > pocetAtomuAMK) //závisí na počtu atomů arom. residua, které ukládám
 		{	/*
                 výpočet vzdálenosti mezi nejbližším atomem aminokyseliny a atomem cukru
              */
@@ -87,12 +89,30 @@ void Main()
             var nejblizsiAtomAmk = sorted.ElementAt(0).First();
             var angle = 0.0;
 
+			//zjištění kolik mám AMK (hrubou silou, předpokládám, že nemám víc než 4)
+			if (sorted.ElementAt(pocetAtomuAMK).First().PdbResidueName.Equals("HIS"))
+			{
+				if (sorted.ElementAt(pocetAtomuAMK*2).First().PdbResidueName.Equals("HIS"))
+				{
+					if (sorted.ElementAt(pocetAtomuAMK*3).First().PdbResidueName.Equals("HIS"))
+					{
+						pocetAtomuAMK = pocetAtomuAMK * 4;
+					}else
+					{
+						pocetAtomuAMK = pocetAtomuAMK * 3;
+					}
+				}else
+				{
+					pocetAtomuAMK = pocetAtomuAMK * 2;
+				}
+			}
+
             //porovnám každý N nebo O z aminokyseliny s každým N nebo O cukru
-            for (int amk = 0; amk < 4; amk++)
+            for (int amk = 0; amk < pocetAtomuAMK; amk++)
             {
-                for (int i = 3; i < sorted.Count; i++)//hledám nejbližší atom cukru = procházím až atomy cukru 
+                for (int i = pocetAtomuAMK-1; i < sorted.Count; i++)//hledám nejbližší atom cukru = procházím až atomy cukru 
 			    {	
-                    if ((sorted.ElementAt(i).First().PdbResidueName() != "HIS") && !(sorted.ElementAt(i).First().ElementSymbol.ToString().Equals("C")))//teoreticky můžu mít v sorted víc aromatických residuí než jedno
+                    if ((sorted.ElementAt(i).First().PdbResidueName() != "HIS") && !(sorted.ElementAt(i).First().ElementSymbol.ToString().Equals("C")))//atomy HIS už by tam být neměly, ale pro jistotu nechávám podmínku
 					{
 				    	Vector3D d = new Vector3D( (sorted.ElementAt(i).First().Position.X - sorted.ElementAt(amk).First().Position.X), 
 													(sorted.ElementAt(i).First().Position.Y - sorted.ElementAt(amk).First().Position.Y), 
@@ -120,27 +140,63 @@ void Main()
             
             if (minDistance < 3.6)
             {
-                var angleQuery = QueryBuilder.AtomIds(nejblizsiAtom.Id).ConnectedAtoms(1).ToMetaQuery().Compile();
-                var angleMotiv = angleQuery.Matches(str).OrderBy(x => x.Atoms.First().IsHetAtom()).ThenBy(x => x.Atoms.First().Id).Select(x => x.Atoms).ToList();
-				
-                for (var a=0; a < angleMotiv.ElementAt(0).Count; a++)
+				//
+                var angleQueryAMK = QueryBuilder.AtomIds(nejblizsiAtomAmk.Id).ConnectedAtoms(1).ToMetaQuery().Compile();
+                var angleMotivAMK = angleQuery.Matches(str).OrderBy(x => x.Atoms.First().IsHetAtom()).ThenBy(x => x.Atoms.First().Id).Select(x => x.Atoms).ToList();
+
+				var angleQueryCukr = QueryBuilder.AtomIds(nejblizsiAtom.Id).ConnectedAtoms(1).ToMetaQuery().Compile();
+                var angleMotivCukr = angleQuery.Matches(str).OrderBy(x => x.Atoms.First().IsHetAtom()).ThenBy(x => x.Atoms.First().Id).Select(x => x.Atoms).ToList();
+
+				var vodik = false;
+				//zjištění, jestli Náš atom na AMK má navázaný vodík
+				for (var a = 0; a < angleMotivAMK.Count; a++)
 				{
-                    if (angleMotiv.ElementAt(0).ElementAt(a).ElementSymbol.ToString().Equals("C"))
-                    {
-                        var d1 = new Vector3D( (angleMotiv.ElementAt(0).ElementAt(a).Position.X - nejblizsiSouradnice.X),
-                                                (angleMotiv.ElementAt(0).ElementAt(a).Position.Y - nejblizsiSouradnice.Y),
-                                                (angleMotiv.ElementAt(0).ElementAt(a).Position.Z - nejblizsiSouradnice.Z) );
-                        var sin1 = Math.Abs(angleMotiv.ElementAt(0).ElementAt(a).Position.X - nejblizsiSouradnice.X) / d1.Length;
-                        var sin2 = Math.Abs(nejblizsiSouradnice.X - nejblizsiAtomAmk.Position.X) / minDistance;
-                        angle = (Math.Asin(sin1) + Math.Asin(sin2)) * (180 / Math.PI);
-                    }
-                }
+					if (angleMotiv.ElementAt(a).ElementSymbol.ToString().Equals("H"))
+					{
+						vodik = true;
+					}
+				}
+
+				//atom, který má vodík musí být uprostřed při výpočtu úhlu
+				if (vodik)
+				{
+					for (var a = 0; a < angleMotivAMK.ElementAt(0).Count; a++)
+					{
+                    	if (angleMotivAMK.ElementAt(0).First().PdbResidueName.Equals("HIS") && angleMotivAMK.ElementAt(0).ElementAt(a).ElementSymbol.ToString().Equals("C")) //když jsou tam dva C, beru první
+                    	{
+                        	var d2 = new Vector3D( (angleMotivAMK.ElementAt(0).ElementAt(a).Position.X - nejblizsiAtomAmk.X),
+                                                (angleMotivAMK.ElementAt(0).ElementAt(a).Position.Y - nejblizsiAtomAmk.Y),
+                                                (angleMotivAMK.ElementAt(0).ElementAt(a).Position.Z - nejblizsiAtomAmk.Z) );
+                        	var sin2 = Math.Abs(angleMotivAMK.ElementAt(0).ElementAt(a).Position.X - nejblizsiSouradnice.X) / d2.Length;
+
+                        	var sin2 = Math.Abs(nejblizsiSouradnice.X - nejblizsiAtomAmk.Position.X) / minDistance;
+                        	angle = (Math.Asin(sin1) + Math.Asin(sin2)) * (180 / Math.PI);
+						}
+                	}
+
+				}else
+				{
+					for (var a = 0; a < angleMotivCukr.ElementAt(0).Count; a++)
+					{
+                    	if (angleMotivCukr.ElementAt(0).First().PdbResidueName.Equals("HIS") && angleMotivCukr.ElementAt(0).ElementAt(a).ElementSymbol.ToString().Equals("C")) //PROČ VÍCKRÁT ELEMENTAT?
+                    	{
+                        	var d1 = new Vector3D( (angleMotivCukr.ElementAt(0).ElementAt(a).Position.X - nejblizsiSouradnice.X),
+                                                (angleMotivCukr.ElementAt(0).ElementAt(a).Position.Y - nejblizsiSouradnice.Y),
+                                                (angleMotivCukr.ElementAt(0).ElementAt(a).Position.Z - nejblizsiSouradnice.Z) );
+                        	var sin1 = Math.Abs(angleMotivCukr.ElementAt(0).ElementAt(a).Position.X - nejblizsiSouradnice.X) / d1.Length;
+
+                        	var sin2 = Math.Abs(nejblizsiSouradnice.X - nejblizsiAtomAmk.Position.X) / minDistance;
+                        	angle = (Math.Asin(sin1) + Math.Asin(sin2)) * (180 / Math.PI);
+                    	}
+                	}
+				}
+                
             }
 			
 			angle.Dump();
 			
 			//uložit: označení motivu; vzdálenost cukr-arom. amk; torzni uhel
-			if ((angle > 110) && (angle < 130)) //filtr pro výběr motivů
+			if (angle == 0.0) //filtr pro výběr motivů zatím vypnutý, jen ošetřuji případy, kdy se úhel nepočítal
 			{
 				var zapis = new StringBuilder();
 				zapis.Append(Path.GetFileNameWithoutExtension(e));
