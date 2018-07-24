@@ -39,7 +39,7 @@ void Main()
         vyfiltrování motivů se správnou vzdáleností a zároveň uložení atomů, které jsou potřeba pro torzní úhel (CH atomy aromatického kruhu + CH atomy napojené na kruh)
 	*/								
 	//HIS
-	var stacking2 = QueryBuilder.Cluster(3.5, 
+	var vodikova_vazba = QueryBuilder.Cluster(5, 
 						QueryBuilder.Or(QueryBuilder.Atoms(new string[]{"O"}), QueryBuilder.Atoms(new string[]{"N"})).Inside(QueryBuilder.Residues(new string[]{"HIS"})).Union(),
 						QueryBuilder.Or(QueryBuilder.Rings(new string[]{"C", "C", "C", "C", "O"}), QueryBuilder.Rings(new string[]{"C", "C", "C", "C", "C", "O"})).ConnectedAtoms(2).
 							Flatten(a => QueryBuilder.Find(a, QueryBuilder.Or(QueryBuilder.Atoms(new string[]{"O"}), QueryBuilder.Atoms(new string[]{"N"}), 
@@ -67,9 +67,9 @@ void Main()
         /*
             varianty proměnné sorted, podle toho, s čím aktuálně potřebuju pracovat
          */
-		//var sorted = stacking2.Matches(str).OrderBy(x => x.Atoms.First().IsHetAtom()).ThenBy(x => x.Atoms.First().PdbName()).Select(x => x.Atoms.First().Position).ToList();
-		//var sorted = stacking2.Matches(str).OrderBy(x => x.Atoms.First().IsHetAtom()).ThenBy(x => x.Atoms.First().PdbName()).ToList();
-		var sorted = stacking2.Matches(str).OrderBy(x => x.Atoms.First().IsHetAtom()).ThenBy(x => x.Atoms.First().PdbName()).Select(x => x.Atoms).ToList();
+		//var sorted = vodikova_vazba.Matches(str).OrderBy(x => x.Atoms.First().IsHetAtom()).ThenBy(x => x.Atoms.First().PdbName()).Select(x => x.Atoms.First().Position).ToList();
+		//var sorted = vodikova_vazba.Matches(str).OrderBy(x => x.Atoms.First().IsHetAtom()).ThenBy(x => x.Atoms.First().PdbName()).ToList();
+		var sorted = vodikova_vazba.Matches(str).OrderBy(x => x.Atoms.First().IsHetAtom()).ThenBy(x => x.Atoms.First().PdbName()).Select(x => x.Atoms).ToList();
         //sorted.Dump();
 		
         /*
@@ -112,7 +112,7 @@ void Main()
             {
                 for (int i = pocetAtomuAMK-1; i < sorted.Count; i++)//hledám nejbližší atom cukru = procházím až atomy cukru 
 			    {	
-                    if ((sorted.ElementAt(i).First().PdbResidueName() != "HIS") && !(sorted.ElementAt(i).First().ElementSymbol.ToString().Equals("C")))//atomy HIS už by tam být neměly, ale pro jistotu nechávám podmínku
+                    if ((sorted.ElementAt(i).First().PdbResidueName() != "HIS") && !(sorted.ElementAt(i).First().ElementSymbol.ToString().Equals("C")))//atomy HIS už by tam být neměly, ale jsou tam...
 					{
 				    	Vector3D d = new Vector3D( (sorted.ElementAt(i).First().Position.X - sorted.ElementAt(amk).First().Position.X), 
 													(sorted.ElementAt(i).First().Position.Y - sorted.ElementAt(amk).First().Position.Y), 
@@ -136,8 +136,12 @@ void Main()
                 výpočet úhlu pro filtr
             */
 			
-            
-            if (minDistance < 3.6)
+            if (minDistance == 0.0)
+			{
+				"CHYBA".Dump(); //jen pro přehled, jak moc je problém s řazením atomů závažný
+			}
+
+            if (minDistance < 3.6 && minDistance != 0.0) //problém s řazením - atomy cukru se dostaly mezi atomy AMK (u HIS jen u jednoho motivu)
             {
 				//
                 var angleQueryAMK = QueryBuilder.AtomIds(nejblizsiAtomAmk.Id).ConnectedAtoms(1).ToMetaQuery().Compile();
@@ -158,7 +162,7 @@ void Main()
 
 				//atom, který má vodík musí být uprostřed při výpočtu úhlu
 				if (vodik)
-				{
+				{//uprostřed je N na AMK
 					for (var a = 0; a < angleMotivAMK.ElementAt(0).Count; a++)
 					{
                     	if (angleMotivAMK.ElementAt(0).First().PdbResidueName().Equals("HIS") && angleMotivAMK.ElementAt(0).ElementAt(a).ElementSymbol.ToString().Equals("C")) //když jsou tam dva C, beru první
@@ -174,10 +178,10 @@ void Main()
                 	}
 
 				}else
-				{
+				{//uprostřed je O nebo N cukru
 					for (var a = 0; a < angleMotivCukr.ElementAt(0).Count; a++)
 					{
-                    	if (angleMotivCukr.ElementAt(0).First().PdbResidueName().Equals("HIS") && angleMotivCukr.ElementAt(0).ElementAt(a).ElementSymbol.ToString().Equals("C")) //PROČ VÍCKRÁT ELEMENTAT?
+                    	if (angleMotivCukr.ElementAt(0).ElementAt(a).ElementSymbol.ToString().Equals("C")) //PROČ VÍCKRÁT ELEMENTAT?
                     	{
                         	var d1 = new Vector3D( (angleMotivCukr.ElementAt(0).ElementAt(a).Position.X - nejblizsiSouradnice.X),
                                                 (angleMotivCukr.ElementAt(0).ElementAt(a).Position.Y - nejblizsiSouradnice.Y),
@@ -195,7 +199,7 @@ void Main()
 			angle.Dump();
 			
 			//uložit: označení motivu; vzdálenost cukr-arom. amk; torzni uhel
-			if (angle != 0.0) //filtr pro výběr motivů zatím vypnutý, jen ošetřuji případy, kdy se úhel nepočítal
+			if (angle != 0.0) //filtr pro výběr motivů zatím vypnutý, jen ošetřuji případy, kdy se úhel nepočítal, protože minimální vzdálenost byla příliš veliká
 			{
 				var zapis = new StringBuilder();
 				zapis.Append(Path.GetFileNameWithoutExtension(e));
