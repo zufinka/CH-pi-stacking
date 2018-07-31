@@ -170,7 +170,7 @@ void Main()
                         	var d2 = new Vector3D( (angleMotivAMK.ElementAt(0).ElementAt(a).Position.X - nejblizsiAtomAmk.Position.X),
                                                 (angleMotivAMK.ElementAt(0).ElementAt(a).Position.Y - nejblizsiAtomAmk.Position.Y),
                                                 (angleMotivAMK.ElementAt(0).ElementAt(a).Position.Z - nejblizsiAtomAmk.Position.Z) );
-                        	var sin1 = Math.Abs(angleMotivAMK.ElementAt(0).ElementAt(a).Position.X - nejblizsiSouradnice.X) / d2.Length;
+                        	var sin1 = Math.Abs(angleMotivAMK.ElementAt(0).ElementAt(a).Position.X - nejblizsiAtomAmk.Position.X) / d2.Length;
 
                         	var sin2 = Math.Abs(nejblizsiSouradnice.X - nejblizsiAtomAmk.Position.X) / minDistance;
                         	angle = (Math.Asin(sin1) + Math.Asin(sin2)) * (180 / Math.PI);
@@ -197,6 +197,10 @@ void Main()
             }
 			
 			angle.Dump();
+			if (angle == 0.0 && minDistance < 3.6)//z důvodů neošetření pár chyb - pro přehled, o kolik motivů jsem přišla
+			{
+				pocetNepocitanychMotivu++;
+			}
 			
 			//uložit: označení motivu; vzdálenost cukr-arom. amk; torzni uhel
 			if (angle != 0.0) //filtr pro výběr motivů zatím vypnutý, jen ošetřuji případy, kdy se úhel nepočítal, protože minimální vzdálenost byla příliš veliká
@@ -252,6 +256,8 @@ void Main()
 			}
         }
 	}
+
+	pocetNepocitanychMotivu.Dump();
 
 	motivesCount.Add(lastPdbID, motiveCount);
 
