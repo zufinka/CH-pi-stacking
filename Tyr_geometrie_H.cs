@@ -1,22 +1,3 @@
-<Query Kind="Expression">
-  <Reference>E:\Zuzka\CH_stacking\Newtonsoft.Json.dll</Reference>
-  <Reference>E:\Zuzka\CH_stacking\System.Interactive.dll</Reference>
-  <Reference>&lt;RuntimeDirectory&gt;\System.IO.dll</Reference>
-  <Reference>E:\Zuzka\CH_stacking\System.Reactive.Core.dll</Reference>
-  <Reference>&lt;RuntimeDirectory&gt;\System.Threading.dll</Reference>
-  <Reference>&lt;RuntimeDirectory&gt;\System.Threading.Tasks.dll</Reference>
-  <Reference>&lt;RuntimeDirectory&gt;\System.Threading.Tasks.Parallel.dll</Reference>
-  <Reference>&lt;RuntimeDirectory&gt;\System.Threading.Timer.dll</Reference>
-  <Reference>E:\Zuzka\CH_stacking\WebChemistry.Framework.Core.dll</Reference>
-  <Reference>E:\Zuzka\CH_stacking\WebChemistry.Queries.Core.dll</Reference>
-  <Namespace>System.Threading.Tasks</Namespace>
-  <Namespace>WebChemistry.Framework.Core</Namespace>
-  <Namespace>WebChemistry.Framework.Core.Pdb</Namespace>
-  <Namespace>WebChemistry.Framework.Math</Namespace>
-  <Namespace>WebChemistry.Queries.Core</Namespace>
-  <IncludePredicateBuilder>true</IncludePredicateBuilder>
-</Query>
-
 using System;
 using WebChemistry.Framework.Core;
 using WebChemistry.Queries.Core;
@@ -31,16 +12,17 @@ void Main()
 {
 	Directory.SetCurrentDirectory(@"E:\Zuzka\CH_stacking");//výběr pracovního adresáře
 	
-	var files = Directory.GetFiles("motivy/C3C4/HIS/all/vodiky/ligand"); //seznam PDB motivů s vodíky
+	var files = Directory.GetFiles("motivy/C3C4/TYR/all2/vodiky/ligand"); //seznam PDB motivů s vodíky
     files.Count().Dump();//pro přehled
+	
 	
 	/*
         patternQuery dotazy:
         vyfiltrování motivů se správnou vzdáleností a zároveň uložení atomů, které jsou potřeba pro torzní úhel (CH atomy aromatického kruhu + CH atomy napojené na kruh)
 	*/								
-	//HIS
+	//TYR
 	var vodikova_vazba = QueryBuilder.Cluster(5, 
-						QueryBuilder.Or(QueryBuilder.Atoms(new string[]{"O"}), QueryBuilder.Atoms(new string[]{"N"})).Inside(QueryBuilder.Residues(new string[]{"HIS"})).Union(),
+						QueryBuilder.Or(QueryBuilder.Atoms(new string[]{"O"}), QueryBuilder.Atoms(new string[]{"N"})).Inside(QueryBuilder.Residues(new string[]{"TYR"})).Union(),
 						QueryBuilder.Or(QueryBuilder.Rings(new string[]{"C", "C", "C", "C", "O"}), QueryBuilder.Rings(new string[]{"C", "C", "C", "C", "C", "O"})).ConnectedAtoms(2).
 							Flatten(a => QueryBuilder.Find(a, QueryBuilder.Or(QueryBuilder.Atoms(new string[]{"O"}), QueryBuilder.Atoms(new string[]{"N"}), 
                                                                                 QueryBuilder.Atoms(new string[]{"C"})))).Union()).
@@ -50,7 +32,7 @@ void Main()
         proměnné potřebné pro zápis do souboru
      */
     var zapisSet = new HashSet<String>();
-	zapisSet.Add("name;ligand;aminoacid_atom;distance;angle;signature;chain;");
+	zapisSet.Add("name;ligand;stacking distance;stacking torsion angle;signature;chain;");
     var ligandName = new List<String>();//ligandy ve vybraných motivech
     var pdbNames = new HashSet<String>();//PDB ID struktur, ve kterých byly nalezeny hledané motivy
     int motiveCount = 1;//počítadlo motivů v rámci jedné PDB struktury
@@ -59,35 +41,34 @@ void Main()
     var pdbLigands = new Dictionary<String, List<String>>();//ukládá seznam ligandů k jednotlivým strukturám (PDB ID)
     var ligandsHistogram = new Dictionary<String, int>();//ukládá seznam ligandů a jejich počet
 
-	var pocetNepocitanychMotivu = 0; //pro kontrolu počtu motivů s chybou při výpočtu
+    var pocetNepocitanychMotivu = 0; //pro kontrolu počtu motivů s chybou při výpočtu
 	
 	foreach (var e in files)
 	{
 		var str = StructureReader.Read(e).Structure;
 		
-		//HIS řazení: N, ND1, NE2, O !! pozor na řazení více HIS (N, N, ND1, ND1, NE2, NE2, O, O)
+		//TYR řazení: 
         /*
             varianty proměnné sorted, podle toho, s čím aktuálně potřebuju pracovat
          */
-		//var sorted = vodikova_vazba.Matches(str).OrderBy(x => x.Atoms.First().IsHetAtom()).ThenBy(x => x.Atoms.First().PdbName()).Select(x => x.Atoms.First().Position).ToList();
-		//var sorted = vodikova_vazba.Matches(str).OrderBy(x => x.Atoms.First().IsHetAtom()).ThenBy(x => x.Atoms.First().PdbName()).ToList();
-		var sorted = vodikova_vazba.Matches(str).OrderBy(x => x.Atoms.First().IsHetAtom()).ThenBy(x => x.Atoms.First().PdbName()).Select(x => x.Atoms).ToList();
-        //sorted.Dump();
+		//var sorted = stacking2.Matches(str).OrderBy(x => x.Atoms.First().IsHetAtom()).ThenBy(x => x.Atoms.First().PdbName()).Select(x => x.Atoms.First().Position).ToList();
+		//var sorted = stacking2.Matches(str).OrderBy(x => x.Atoms.First().IsHetAtom()).ThenBy(x => x.Atoms.First().PdbName()).ToList();
+		var sorted = stacking2.Matches(str).OrderBy(x => x.Atoms.First().IsHetAtom()).ThenBy(x => x.Atoms.First().PdbName()).Select(x => x.Atoms).ToList();
 		
         /*
             projdu případy, kdy se našly motivy s aromatickou amk v blízkosti cukru
-            aromatická amk bude nalezená vždy!!! (možná už bezpředmětná podmínka, z historických důvodů ponechána)
+            aromatická amk bude nalezená vždy!!!
          */
-		var pocetAtomuJedneAMK = 4;
-		var pocetAtomuAMK = pocetAtomuJedneAMK; //zkontrolovat, jestli jsem ji začala používat všude, kde to číslo používám
+        var pocetAtomuJedneAMK = 4;
+		var pocetAtomuAMK = pocetAtomuJedneAMK; 
 		if (sorted.Count > pocetAtomuAMK) //závisí na počtu atomů arom. residua, které ukládám
 		{	
 			//zjištění kolik mám AMK (hrubou silou, předpokládám, že nemám víc než 4)
-			if (sorted.ElementAt(pocetAtomuAMK).First().PdbResidueName().Equals("HIS"))
+			if (sorted.ElementAt(pocetAtomuAMK).First().PdbResidueName().Equals("TYR"))
 			{
-				if (sorted.ElementAt(pocetAtomuAMK*2).First().PdbResidueName().Equals("HIS"))
+				if (sorted.ElementAt(pocetAtomuAMK*2).First().PdbResidueName().Equals("TYR"))
 				{
-					if (sorted.ElementAt(pocetAtomuAMK*3).First().PdbResidueName().Equals("HIS"))
+					if (sorted.ElementAt(pocetAtomuAMK*3).First().PdbResidueName().Equals("TYR"))
 					{
 						pocetAtomuAMK = pocetAtomuAMK * 4;
 					}else
@@ -100,7 +81,7 @@ void Main()
 				}
 			}
 
-			/*
+            /*
                 výpočet vzdálenosti mezi nejbližším atomem aminokyseliny a atomem cukru
              */
 			var nejblizsiSouradnice = new Vector3D();
@@ -115,7 +96,7 @@ void Main()
             {
                 for (int i = pocetAtomuAMK-1; i < sorted.Count; i++)//hledám nejbližší atom cukru = procházím až atomy cukru 
 			    {	
-                    if ((sorted.ElementAt(i).First().PdbResidueName() != "HIS") && !(sorted.ElementAt(i).First().ElementSymbol.ToString().Equals("C")))//atomy HIS už by tam být neměly, ale jsou tam...
+                    if ((sorted.ElementAt(i).First().PdbResidueName() != "TYR") && !(sorted.ElementAt(i).First().ElementSymbol.ToString().Equals("C")))//atomy HIS už by tam být neměly, ale jsou tam...
 					{
 				    	Vector3D d = new Vector3D( (sorted.ElementAt(i).First().Position.X - sorted.ElementAt(amk).First().Position.X), 
 													(sorted.ElementAt(i).First().Position.Y - sorted.ElementAt(amk).First().Position.Y), 
@@ -144,7 +125,7 @@ void Main()
 				"CHYBA".Dump(); //jen pro přehled, jak moc je problém s řazením atomů závažný
 			}
 
-            if (minDistance < 3.6 && minDistance != 0.0) //problém s řazením - atomy cukru se dostaly mezi atomy AMK (u HIS jen u jednoho motivu)
+            if (minDistance < 3.6 && minDistance != 0.0) //problém s řazením - atomy cukru se dostaly mezi atomy AMK
             {
                 var angleQueryAMK = QueryBuilder.AtomIds(nejblizsiAtomAmk.Id).ConnectedAtoms(1).ToMetaQuery().Compile();
                 var angleMotivAMK = angleQueryAMK.Matches(str).OrderBy(x => x.Atoms.First().IsHetAtom()).ThenBy(x => x.Atoms.First().Id).Select(x => x.Atoms).ToList();
@@ -194,11 +175,10 @@ void Main()
                         	angle = (Math.Asin(sin1) + Math.Asin(sin2)) * (180 / Math.PI);
                     	}
                 	}
-				}
-                
+				} 
             }
-			
-			angle.Dump();
+
+            angle.Dump();
 			if (angle == 0.0 && minDistance < 3.6)//z důvodů neošetření pár chyb - pro přehled, o kolik motivů jsem přišla
 			{
 				pocetNepocitanychMotivu++;
@@ -212,11 +192,9 @@ void Main()
 				zapis.Append(";");
 				zapis.Append(nejblizsiResiduum);
 				zapis.Append(";");
-                zapis.Append(nejblizsiAtomAmk.ElementSymbol);
-                zapis.Append(";");
 				zapis.Append(minDistance);
 				zapis.Append(";");
-				zapis.Append(angle);
+				zapis.Append(filterAngle);
 				zapis.Append(";");
 				foreach (var res in str.PdbResidues()){
 					zapis.Append(res.Name);
@@ -231,7 +209,7 @@ void Main()
                 ligandName.Add(nejblizsiResiduum);
 
                 //zápis vybraného motivu do souboru
-				var path = new StringBuilder("motivy/C3C4/HIS/H_23_7_2018/ligand/");
+				var path = new StringBuilder("motivy/C3C4/TYR/5_11_2017/ligand/");
 				path.Append(Path.GetFileNameWithoutExtension(e));
 				using (TextWriter write = File.CreateText(path.ToString())){
 					str.WritePdb(write);
@@ -256,14 +234,14 @@ void Main()
 					lastPdbID = pdbID;
 				}
 			}
-        }
+		}
 	}
-
-	pocetNepocitanychMotivu.Dump();
-
+	
 	motivesCount.Add(lastPdbID, motiveCount);
 
-    File.WriteAllLines("HIS_H_ligand.csv", zapisSet);
+    pocetNepocitanychMotivu.Dump();
+
+    File.WriteAllLines("TYR_ligand.csv", zapisSet);
 	
     //výpočet histogramu jednotlivých ligandů
     var ligandNames = new HashSet<String>();//pomocná proměnná pro zjištění, jestli už jsem daný ligand měla nebo ne
@@ -279,7 +257,7 @@ void Main()
     }
 	
 	int counter = 1;
-	using (TextWriter writer = File.CreateText("HIS_H_ligand_pdb.csv"))
+	using (TextWriter writer = File.CreateText("TYR_ligand_pdb.csv"))
 	{
 		writer.WriteLine("pdbID;motives count;ligands");
 		foreach (var a in pdbNames)
@@ -303,7 +281,7 @@ void Main()
 		}
 	}
 	
-	using (TextWriter wr = File.CreateText("HIS_H_ligand_ligands.csv"))
+	using (TextWriter wr = File.CreateText("TYR_ligand_ligands.csv"))
 	{
 		wr.WriteLine("ligand;count;");
 		foreach (var l in ligandNames)
