@@ -24,15 +24,14 @@ void Main()
 	var vodikova_vazba = QueryBuilder.Cluster(5, 
 						QueryBuilder.Or(QueryBuilder.Atoms(new string[]{"O"}), QueryBuilder.Atoms(new string[]{"N"})).Inside(QueryBuilder.Residues(new string[]{"TYR"})).Union(),
 						QueryBuilder.Or(QueryBuilder.Rings(new string[]{"C", "C", "C", "C", "O"}), QueryBuilder.Rings(new string[]{"C", "C", "C", "C", "C", "O"})).ConnectedAtoms(2).
-							Flatten(a => QueryBuilder.Find(a, QueryBuilder.Or(QueryBuilder.Atoms(new string[]{"O"}), QueryBuilder.Atoms(new string[]{"N"}), 
-                                                                                QueryBuilder.Atoms(new string[]{"C"})))).Union()).
+							Flatten(a => QueryBuilder.Find(a, QueryBuilder.Or(QueryBuilder.Atoms(new string[]{"O"}), QueryBuilder.Atoms(new string[]{"N"})))).Union()).
 									Flatten(l => QueryBuilder.Find(l, QueryBuilder.Atoms())).ToMetaQuery().Compile();
 									
     /*
         proměnné potřebné pro zápis do souboru
      */
     var zapisSet = new HashSet<String>();
-	zapisSet.Add("name;ligand;stacking distance;stacking torsion angle;signature;chain;");
+	zapisSet.Add("name;ligand;aminoacid_atom;sugar_atom;distance;angle;");
     var ligandName = new List<String>();//ligandy ve vybraných motivech
     var pdbNames = new HashSet<String>();//PDB ID struktur, ve kterých byly nalezeny hledané motivy
     int motiveCount = 1;//počítadlo motivů v rámci jedné PDB struktury
@@ -42,6 +41,7 @@ void Main()
     var ligandsHistogram = new Dictionary<String, int>();//ukládá seznam ligandů a jejich počet
 
     var pocetNepocitanychMotivu = 0; //pro kontrolu počtu motivů s chybou při výpočtu
+	var pocet = 0; //počet nalezených motivů
 	
 	foreach (var e in files)
 	{
@@ -87,9 +87,9 @@ void Main()
 			var nejblizsiSouradnice = new Vector3D();
 			String nejblizsiResiduum = "";
 			double minDistance = 10;
-            var nejblizsiAtom = sorted.ElementAt(pocetAtomuAMK).First();
+            var nejblizsiAtomCukr = sorted.ElementAt(pocetAtomuAMK).First();
             var nejblizsiAtomAmk = sorted.ElementAt(0).First();
-            var angle = 0.0;
+            var angle = -10.0;
 
             //porovnám každý N nebo O z aminokyseliny s každým N nebo O cukru
             for (int amk = 0; amk < sorted.Count; amk++)
@@ -106,12 +106,12 @@ void Main()
 				
 				    		var distance = d.Length;
 				
-				    		if ((distance < minDistance) && (sorted.ElementAt(amk).First().PdbResidueName().Equals("TYR")))
+				    		if ((distance < minDistance) )//&& (sorted.ElementAt(amk).First().PdbResidueName().Equals("TYR")))
 				    		{
 					    		nejblizsiSouradnice = sorted.ElementAt(i).First().Position;
 					    		nejblizsiResiduum = sorted.ElementAt(i).First().PdbResidueName();
 					    		minDistance = distance;
-                        		nejblizsiAtom = sorted.ElementAt(i).First();
+                        		nejblizsiAtomCukr = sorted.ElementAt(i).First();
                         		nejblizsiAtomAmk = sorted.ElementAt(amk).First();
 				    		}
 						}
@@ -128,19 +128,19 @@ void Main()
 				"CHYBA".Dump(); //jen pro přehled, jak moc je problém s řazením atomů závažný
 			}
 
-            if (minDistance < 3.6 && minDistance != 0.0) //problém s řazením - atomy cukru se dostaly mezi atomy AMK
+            if (minDistance < 3.43 && minDistance != 0.0) //problém s řazením - atomy cukru se dostaly mezi atomy AMK
             {
                 var angleQueryAMK = QueryBuilder.AtomIds(nejblizsiAtomAmk.Id).ConnectedAtoms(1).ToMetaQuery().Compile();
                 var angleMotivAMK = angleQueryAMK.Matches(str).OrderBy(x => x.Atoms.First().IsHetAtom()).ThenBy(x => x.Atoms.First().Id).Select(x => x.Atoms).ToList();
 
-				var angleQueryCukr = QueryBuilder.AtomIds(nejblizsiAtom.Id).ConnectedAtoms(1).ToMetaQuery().Compile();
+				var angleQueryCukr = QueryBuilder.AtomIds(nejblizsiAtomCukr.Id).ConnectedAtoms(1).ToMetaQuery().Compile();
                 var angleMotivCukr = angleQueryCukr.Matches(str).OrderBy(x => x.Atoms.First().IsHetAtom()).ThenBy(x => x.Atoms.First().Id).Select(x => x.Atoms).ToList();
 
 				var vodik = false;
 				//zjištění, jestli Náš atom na AMK má navázaný vodík
-				for (var a = 0; a < angleMotivAMK.First().Count; a++)
+				for (var a = 0; a < angleMotivCukr.First().Count; a++)
 				{
-					if (angleMotivAMK.First().ElementAt(a).ElementSymbol.ToString().Equals("H"))
+					if (angleMotivCukr.First().ElementAt(a).ElementSymbol.ToString().Equals("H"))
 					{
 						vodik = true;
 					}
@@ -148,48 +148,87 @@ void Main()
 
 				//atom, který má vodík musí být uprostřed při výpočtu úhlu
 				if (vodik)
-				{//uprostřed je N na AMK
-					for (var a = 0; a < angleMotivAMK.ElementAt(0).Count; a++)
-					{
-                    	if (angleMotivAMK.ElementAt(0).First().PdbResidueName().Equals("TYR") && angleMotivAMK.ElementAt(0).ElementAt(a).ElementSymbol.ToString().Equals("C")) //když jsou tam dva C, beru první
-                    	{
-                        	var d2 = new Vector3D( (angleMotivAMK.ElementAt(0).ElementAt(a).Position.X - nejblizsiAtomAmk.Position.X),
-                                                (angleMotivAMK.ElementAt(0).ElementAt(a).Position.Y - nejblizsiAtomAmk.Position.Y),
-                                                (angleMotivAMK.ElementAt(0).ElementAt(a).Position.Z - nejblizsiAtomAmk.Position.Z) );
-                        	var sin1 = Math.Abs(angleMotivAMK.ElementAt(0).ElementAt(a).Position.X - nejblizsiAtomAmk.Position.X) / d2.Length;
-
-                        	var sin2 = Math.Abs(nejblizsiSouradnice.X - nejblizsiAtomAmk.Position.X) / minDistance;
-                        	angle = (Math.Asin(sin1) + Math.Asin(sin2)) * (180 / Math.PI);
-						}
-                	}
-
-				}else
 				{//uprostřed je O nebo N cukru
 					for (var a = 0; a < angleMotivCukr.ElementAt(0).Count; a++)
 					{
-                    	if (angleMotivCukr.ElementAt(0).ElementAt(a).ElementSymbol.ToString().Equals("C")) //PROČ VÍCKRÁT ELEMENTAT?
-                    	{
-                        	var d1 = new Vector3D( (angleMotivCukr.ElementAt(0).ElementAt(a).Position.X - nejblizsiSouradnice.X),
+                    	//první pokus o výpočet
+                        	/*var d1 = new Vector3D( (angleMotivCukr.ElementAt(0).ElementAt(a).Position.X - nejblizsiSouradnice.X),
                                                 (angleMotivCukr.ElementAt(0).ElementAt(a).Position.Y - nejblizsiSouradnice.Y),
                                                 (angleMotivCukr.ElementAt(0).ElementAt(a).Position.Z - nejblizsiSouradnice.Z) );
                         	var sin1 = Math.Abs(angleMotivCukr.ElementAt(0).ElementAt(a).Position.X - nejblizsiSouradnice.X) / d1.Length;
 
                         	var sin2 = Math.Abs(nejblizsiSouradnice.X - nejblizsiAtomAmk.Position.X) / minDistance;
-                        	angle = (Math.Asin(sin1) + Math.Asin(sin2)) * (180 / Math.PI);
-                    	}
+                        	angle = (Math.Asin(sin1) + Math.Asin(sin2)) * (180 / Math.PI);*/
+							
+							//pokus o výpočet přes kosinovou větu
+							var aa = new Vector3D( (angleMotivCukr.ElementAt(0).ElementAt(a).Position.X - nejblizsiAtomAmk.Position.X),
+												   (angleMotivCukr.ElementAt(0).ElementAt(a).Position.Y - nejblizsiAtomAmk.Position.Y),
+												   (angleMotivCukr.ElementAt(0).ElementAt(a).Position.Z - nejblizsiAtomAmk.Position.Z) );
+												  
+							var b = new Vector3D( (angleMotivCukr.ElementAt(0).ElementAt(a).Position.X - nejblizsiAtomCukr.Position.X),
+												  (angleMotivCukr.ElementAt(0).ElementAt(a).Position.Y - nejblizsiAtomCukr.Position.Y),
+												  (angleMotivCukr.ElementAt(0).ElementAt(a).Position.Z - nejblizsiAtomCukr.Position.Z) );
+												  
+							var c = new Vector3D( (nejblizsiAtomCukr.Position.X - nejblizsiAtomAmk.Position.X),
+												  (nejblizsiAtomCukr.Position.Y - nejblizsiAtomAmk.Position.Y),
+												  (nejblizsiAtomCukr.Position.Z - nejblizsiAtomAmk.Position.Z) );
+												  
+							var cos = (Math.Pow(2, b.Length) + Math.Pow(2, c.Length) - Math.Pow(2, aa.Length)) / (2 * b.Length * c.Length);
+							angle = Math.Acos(cos) * (180 / Math.PI);
+
+							if ((cos > 1) || (cos < -1))
+							{
+								"CHYBA3".Dump();
+								pocetNepocitanychMotivu++;
+							
+							}
                 	}
-				} 
+				}else
+				{//uprostřed je N na AMK
+					for (var a = 0; a < angleMotivAMK.ElementAt(0).Count; a++)
+					{
+                    	/*var d2 = new Vector3D( (angleMotivAMK.ElementAt(0).ElementAt(a).Position.X - nejblizsiAtomAmk.Position.X),
+                                                (angleMotivAMK.ElementAt(0).ElementAt(a).Position.Y - nejblizsiAtomAmk.Position.Y),
+                                                (angleMotivAMK.ElementAt(0).ElementAt(a).Position.Z - nejblizsiAtomAmk.Position.Z) );
+                        	var sin1 = Math.Abs(angleMotivAMK.ElementAt(0).ElementAt(a).Position.X - nejblizsiAtomAmk.Position.X) / d2.Length;
+
+                        	var sin2 = Math.Abs(nejblizsiSouradnice.X - nejblizsiAtomAmk.Position.X) / minDistance;
+                        	angle = (Math.Asin(sin1) + Math.Asin(sin2)) * (180 / Math.PI);*/
+							
+							//pokus o výpočet přes kosinovou větu
+							var b = new Vector3D( (angleMotivAMK.ElementAt(0).ElementAt(a).Position.X - nejblizsiAtomAmk.Position.X),
+												  (angleMotivAMK.ElementAt(0).ElementAt(a).Position.Y - nejblizsiAtomAmk.Position.Y),
+												  (angleMotivAMK.ElementAt(0).ElementAt(a).Position.Z - nejblizsiAtomAmk.Position.Z) );
+												  
+							var aa = new Vector3D( (angleMotivAMK.ElementAt(0).ElementAt(a).Position.X - nejblizsiAtomCukr.Position.X),
+												  (angleMotivAMK.ElementAt(0).ElementAt(a).Position.Y - nejblizsiAtomCukr.Position.Y),
+												  (angleMotivAMK.ElementAt(0).ElementAt(a).Position.Z - nejblizsiAtomCukr.Position.Z) );
+												  
+							var c = new Vector3D( (nejblizsiAtomCukr.Position.X - nejblizsiAtomAmk.Position.X),
+												  (nejblizsiAtomCukr.Position.Y - nejblizsiAtomAmk.Position.Y),
+												  (nejblizsiAtomCukr.Position.Z - nejblizsiAtomAmk.Position.Z) );
+												  
+							var cos = (Math.Pow(2, b.Length) + Math.Pow(2, c.Length) - Math.Pow(2, aa.Length)) / (2 * b.Length * c.Length);
+							angle =  (Math.Acos(cos)) * (180 / Math.PI);
+
+							if ((cos > 1) || (cos < -1))
+							{
+								"CHYBA3".Dump();
+								pocetNepocitanychMotivu++;
+							}
+                	}
             }
 
             angle.Dump();
-			if (angle == 0.0 && minDistance < 3.6)//z důvodů neošetření pár chyb - pro přehled, o kolik motivů jsem přišla
+			if (angle == -10.0 && minDistance < 3.43)//z důvodů neošetření pár chyb - pro přehled, o kolik motivů jsem přišla
 			{
 				pocetNepocitanychMotivu++;
 			}
 			
 			//uložit: označení motivu; vzdálenost cukr-arom. amk; torzni uhel
-			if (angle != 0.0) //filtr pro výběr motivů zatím vypnutý, jen ošetřuji případy, kdy se úhel nepočítal, protože minimální vzdálenost byla příliš veliká
+			if ((angle > 89) && (angle < 181)) //filtr pro výběr motivů zatím vypnutý, jen ošetřuji případy, kdy se úhel nepočítal, protože minimální vzdálenost byla příliš veliká
 			{
+				pocet++;
 				var zapis = new StringBuilder();
 				zapis.Append(Path.GetFileNameWithoutExtension(e));
 				zapis.Append(";");
@@ -201,14 +240,14 @@ void Main()
 				zapis.Append(";");
 				zapis.Append(angle);
 				zapis.Append(";");
-				foreach (var res in str.PdbResidues()){
+				/*foreach (var res in str.PdbResidues()){
 					zapis.Append(res.Name);
 					zapis.Append(" ");
 				}
 				zapis.Append(";");
 				foreach (var chain in str.PdbChains()){
 					zapis.Append(chain.Key);
-				}
+				}*/
 				
 				zapis.Append(";");
                 ligandName.Add(nejblizsiResiduum);
@@ -244,7 +283,11 @@ void Main()
 	
 	motivesCount.Add(lastPdbID, motiveCount);
 
+    "chyba".Dump();
     pocetNepocitanychMotivu.Dump();
+	"nalezeno".Dump();
+	pocet.Dump();
+
 
     File.WriteAllLines("TYR_ligand.csv", zapisSet);
 	
