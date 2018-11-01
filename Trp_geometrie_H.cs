@@ -124,7 +124,7 @@ void Main()
 				
 				    		var distance = d.Length;
 				
-				    		if ((distance < minDistance)) //&& (sorted.ElementAt(amk).First().PdbResidueName().Equals("TRP")))
+				    		if ((distance < minDistance) && (sorted.ElementAt(amk).First().PdbName().Equals("NE1")) ) //vyloučení atomů páteře 
 				    		{
 					    		nejblizsiSouradnice = sorted.ElementAt(i).First().Position;
 					    		nejblizsiResiduum = sorted.ElementAt(i).First().PdbResidueName();
@@ -151,7 +151,7 @@ void Main()
                 var angleQueryAMK = QueryBuilder.AtomIds(nejblizsiAtomAmk.Id).ConnectedAtoms(1).ToMetaQuery().Compile();
                 var angleMotivAMK = angleQueryAMK.Matches(str).OrderBy(x => x.Atoms.First().IsHetAtom()).ThenBy(x => x.Atoms.First().Id).Select(x => x.Atoms).ToList();
 
-				var angleQueryCukr = QueryBuilder.AtomIds(nejblizsiAtom.Id).ConnectedAtoms(1).ToMetaQuery().Compile();
+				var angleQueryCukr = QueryBuilder.AtomIds(nejblizsiAtomCukr.Id).ConnectedAtoms(1).ToMetaQuery().Compile();
                 var angleMotivCukr = angleQueryCukr.Matches(str).OrderBy(x => x.Atoms.First().IsHetAtom()).ThenBy(x => x.Atoms.First().Id).Select(x => x.Atoms).ToList();
 
 				var vodik = false;
@@ -177,7 +177,8 @@ void Main()
 
                         	var sin2 = Math.Abs(nejblizsiSouradnice.X - nejblizsiAtomAmk.Position.X) / minDistance;
                         	angle = (Math.Asin(sin1) + Math.Asin(sin2)) * (180 / Math.PI);*/
-							
+						if (angleMotivCukr.ElementAt(0).ElementAt(a).ElementSymbol.ToString().Equals("C"))
+						{
 							//pokus o výpočet přes kosinovou větu
 							var aa = new Vector3D( (angleMotivCukr.ElementAt(0).ElementAt(a).Position.X - nejblizsiAtomAmk.Position.X),
 												   (angleMotivCukr.ElementAt(0).ElementAt(a).Position.Y - nejblizsiAtomAmk.Position.Y),
@@ -191,15 +192,15 @@ void Main()
 												  (nejblizsiAtomCukr.Position.Y - nejblizsiAtomAmk.Position.Y),
 												  (nejblizsiAtomCukr.Position.Z - nejblizsiAtomAmk.Position.Z) );
 												  
-							var cos = (Math.Pow(2, b.Length) + Math.Pow(2, c.Length) - Math.Pow(2, aa.Length)) / (2 * b.Length * c.Length);
+							var cos = ((b.Length * b.Length) + (c.Length * c.Length) - (aa.Length *  aa.Length)) / (2 * b.Length * c.Length); //z nějakýho důvodu nefunguje Math.pow(2, aa.Length)
 							angle = Math.Acos(cos) * (180 / Math.PI);
 
 							if ((cos > 1) || (cos < -1))
 							{
 								"CHYBA3".Dump();
 								pocetNepocitanychMotivu++;
-							
 							}
+						}
                 	}
 
 				}else
@@ -213,7 +214,8 @@ void Main()
 
                         	var sin2 = Math.Abs(nejblizsiSouradnice.X - nejblizsiAtomAmk.Position.X) / minDistance;
                         	angle = (Math.Asin(sin1) + Math.Asin(sin2)) * (180 / Math.PI);*/
-							
+						if (angleMotivAMK.ElementAt(0).ElementAt(a).ElementSymbol.ToString().Equals("C"))
+						{	
 							//pokus o výpočet přes kosinovou větu
 							var b = new Vector3D( (angleMotivAMK.ElementAt(0).ElementAt(a).Position.X - nejblizsiAtomAmk.Position.X),
 												  (angleMotivAMK.ElementAt(0).ElementAt(a).Position.Y - nejblizsiAtomAmk.Position.Y),
@@ -227,7 +229,7 @@ void Main()
 												  (nejblizsiAtomCukr.Position.Y - nejblizsiAtomAmk.Position.Y),
 												  (nejblizsiAtomCukr.Position.Z - nejblizsiAtomAmk.Position.Z) );
 												  
-							var cos = (Math.Pow(2, b.Length) + Math.Pow(2, c.Length) - Math.Pow(2, aa.Length)) / (2 * b.Length * c.Length);
+							var cos = ((b.Length * b.Length) + (c.Length * c.Length) - (aa.Length *  aa.Length)) / (2 * b.Length * c.Length);
 							angle =  (Math.Acos(cos)) * (180 / Math.PI);
 
 							if ((cos > 1) || (cos < -1))
@@ -235,6 +237,7 @@ void Main()
 								"CHYBA3".Dump();
 								pocetNepocitanychMotivu++;
 							}
+						}
                 	}
 				} 
             }
