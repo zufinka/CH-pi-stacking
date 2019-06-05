@@ -12,7 +12,7 @@ void Main()
 	var pdb_list = new HashSet<String>();//seznam odkazů na struktury, které vyhovují kritériím
 	
     HashSet<String> structures = new HashSet<String>();
-	structures = File.ReadAllLines(@"vyber_pdb/pdb_structures_C3C4.txt").ToHashSet(); //vstupní soubor obsahuje cesty k pdb strukturám
+	structures = File.ReadAllLines(@"E:\Zuzka\CH_stacking\vyber_pdb\16_05_2019\pdb_structure.txt").ToHashSet(); //vstupní soubor obsahuje cesty k pdb strukturám
 	structures.Count.Dump();//test
 	
     /*
@@ -47,7 +47,7 @@ void Main()
 			    var counter = 0; //počítadlo motivů v jedné struktuře
 				
 				foreach (var m in result){//projdu motivy ve struktuře
-					var ligandPath = new StringBuilder("motivy/C3C4/HIS/all/motives/");//formátování názvu souboru, do kterého uložím nalezené motivy
+					var ligandPath = new StringBuilder("E:\Zuzka\CH_stacking\motivy\16_05_2019\HIS\motivy");//formátování názvu souboru, do kterého uložím nalezené motivy
 					ligandPath.Append(str.Id);
 					ligandPath.Append(counter);
 					zapis.Append(m.Signature);
