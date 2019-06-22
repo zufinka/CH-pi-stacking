@@ -15,7 +15,6 @@ void Main()
 	
 	//var files = Directory.GetFiles(@"Z:\999986-WebChemData\Databases\PDB\Assemblies");
 	var files = Directory.GetFiles(@"Z:\999986-WebChemData\Databases\PDB\mirrors\units", "*.*", SearchOption.AllDirectories);
-	//var files = Directory.GetFiles(@"Z:\999986-WebChemData\Databases\PDB\updated");
 
 	//procházení doplňkových stuktur ze souboru
 	/*HashSet<String> problemove_struktury_puvodni = File.ReadAllLines(@"E:\Zuzka\CH_stacking\vyber_pdb\16_05_2019\pdb_copy_files.txt").ToHashSet();
