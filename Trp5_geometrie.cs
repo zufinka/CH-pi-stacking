@@ -78,10 +78,13 @@ void Main()
          */
 		if (sorted.Count > 8) //závisí na počtu atomů arom. residua, které ukládám
 		{	
-			//TRP střed šestičlenného cyklu: CE2, CZ3
-			double aromCenterX = (sorted.ElementAt(4).First().Position.X + sorted.ElementAt(6).First().Position.X) / 2;
-			double aromCenterY = (sorted.ElementAt(4).First().Position.Y + sorted.ElementAt(6).First().Position.Y) / 2;
-			double aromCenterZ = (sorted.ElementAt(4).First().Position.Z + sorted.ElementAt(6).First().Position.Z) / 2;
+			//TRP střed pětičlenného cyklu: (střed úsečky CD2 a CE2) a CD1
+			double cdg2X = (sorted.ElementAt(3).First().Position.X + sorted.ElementAt(4).First().Position.X) / 2;
+			double cdg2Y = (sorted.ElementAt(3).First().Position.Y + sorted.ElementAt(4).First().Position.Y) / 2;
+			double cdg2Z = (sorted.ElementAt(3).First().Position.Z + sorted.ElementAt(4).First().Position.Z) / 2;
+			double aromCenterX = (cdg2X + sorted.ElementAt(2).First().Position.X) / 2;
+			double aromCenterY = (cdg2Y + sorted.ElementAt(2).First().Position.Y) / 2;
+			double aromCenterZ = (cdg2Z + sorted.ElementAt(2).First().Position.Z) / 2;
 			Vector3D aromCenter = new Vector3D(aromCenterX, aromCenterY, aromCenterZ);
 
             /*
@@ -112,7 +115,7 @@ void Main()
                 výpočet úhlu pro filtr
             */
             //rovina aromatického kruhu
-			Plane3D rovina = Plane3D.FromPoints(sorted.ElementAt(4).First().Position, sorted.ElementAt(6).First().Position, aromCenter);
+			Plane3D rovina = Plane3D.FromPoints(sorted.ElementAt(4).First().Position, sorted.ElementAt(2).First().Position, aromCenter);
 			
             //vzdálenost nejbližšího CH atomu od roviny aromatického kruhu
             var cPlaneDistance = Math.Abs( rovina.A*nejblizsiSouradnice.X + rovina.B*nejblizsiSouradnice.Y + rovina.C*nejblizsiSouradnice.Z + rovina.D )/
@@ -148,7 +151,7 @@ void Main()
                 ligandName.Add(nejblizsiResiduum);
 
                 //zápis vybraného motivu do souboru
-				var path = new StringBuilder("motivy/C3C4/TRP/5_11_2017/sesticlenny/ligand/");
+				var path = new StringBuilder("motivy/C3C4/TRP/5_11_2017/peticlenny/ligand/");
 				path.Append(Path.GetFileNameWithoutExtension(e));
 				using (TextWriter write = File.CreateText(path.ToString())){
 					str.WritePdb(write);
@@ -178,7 +181,7 @@ void Main()
 	
 	motivesCount.Add(lastPdbID, motiveCount);
 
-    File.WriteAllLines("TRP6_ligand.csv", zapisSet);
+    File.WriteAllLines("TRP5_ligand.csv", zapisSet);
 	
     //výpočet histogramu jednotlivých ligandů
     var ligandNames = new HashSet<String>();//pomocná proměnná pro zjištění, jestli už jsem daný ligand měla nebo ne
@@ -194,7 +197,7 @@ void Main()
     }
 	
 	int counter = 1;
-	using (TextWriter writer = File.CreateText("TRP6_ligand_pdb.csv"))
+	using (TextWriter writer = File.CreateText("TRP5_ligand_pdb.csv"))
 	{
 		writer.WriteLine("pdbID;motives count;ligands");
 		foreach (var a in pdbNames)
@@ -218,7 +221,7 @@ void Main()
 		}
 	}
 	
-	using (TextWriter wr = File.CreateText("TRP6_ligand_ligands.csv"))
+	using (TextWriter wr = File.CreateText("TRP5_ligand_ligands.csv"))
 	{
 		wr.WriteLine("ligand;count;");
 		foreach (var l in ligandNames)

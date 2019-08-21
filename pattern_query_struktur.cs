@@ -31,7 +31,7 @@ Directory.SetCurrentDirectory(@"E:\Zuzka\CH_stacking");//nastaví pracovní adre
 		}
 	}*/
 	
-	structures_upravene = File.ReadAllLines(@"E:\Zuzka\CH_stacking\motivy\16_05_2019\HIS\copystructures700.txt").ToHashSet();
+	structures_upravene = File.ReadAllLines(@"E:\Zuzka\CH_stacking\motivy\16_05_2019\HIS\copystructures4.txt").ToHashSet();
 	structures_upravene.Count.Dump();
 	
 	var copyFiles = new HashSet<String>();
@@ -93,7 +93,7 @@ Directory.SetCurrentDirectory(@"E:\Zuzka\CH_stacking");//nastaví pracovní adre
 			str = null;
 			copyFiles.Remove(e);
 			pojistka++;
-			if (pojistka % 100 == 0){
+			if (pojistka % 4 == 0){
 				String b = String.Format("copystructures{0}.txt", pojistka);
 				File.WriteAllLines(b, copyFiles);
 			}
@@ -105,3 +105,4 @@ Directory.SetCurrentDirectory(@"E:\Zuzka\CH_stacking");//nastaví pracovní adre
 	
 	File.WriteAllLines(@"pdb_ligands_HIS_all.csv", zapisLigandy);
 	File.WriteAllLines(@"pdb_HIS_all.csv", pdb_list);
+}

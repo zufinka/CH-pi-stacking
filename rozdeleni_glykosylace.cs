@@ -30,7 +30,6 @@ void Main()
 {
 	Directory.SetCurrentDirectory(@"E:\Zuzka\CH_stacking");//výběr pracovního adresáře
 	
-	//použít jen jedno z nich!!!!
 	var files = Directory.GetFiles("motivy/C3C4/HIS/all/motives/"); //seznam PDB motivů nalezených při úvodním prohledávání
 	var structures = File.ReadAllLines(@"motivy/C3C4/HIS/pdb_HIS_all.csv").ToHashSet(); //vstupní soubor obsahuje cesty k pdb strukturám ... použít jen vyfiltrovaný seznam pdb
 	structures.Count.Dump();//test
@@ -60,7 +59,7 @@ void Main()
 	
 	var sugar = QueryBuilder.Or(tetrose, pentose).ToMetaQuery().Compile();
 	
-	//jednoduchá glykosilace (dotaz, jestli je obsahuje cukr, který je navázaný na protein)
+	//jednoduchá glykosylace (dotaz, jestli obsahuje cukr, který je navázaný na protein)
 	var connection = QueryBuilder.Or(tetrose, pentose).AmbientResidues(1.5).
 					 Filter (l => QueryBuilder.Count(l, QueryBuilder.AminoAcids()) > 0).ToMetaQuery().Compile();			
 	
@@ -89,7 +88,7 @@ void Main()
 	{
 	try{
 		var str = StructureReader.Read(e).Structure;  // nacti strukturu
-		var result = query.Matches(str); //porovnání s query
+		var result = query.Matches(str); //najdu motivy s cukrem
 		var motivesCount = 0;//počítadlo nalezených motivů
 		var name = new StringBuilder(Path.GetFileNameWithoutExtension(e));//jméno pdb pro zápis motivu
 
@@ -110,7 +109,7 @@ void Main()
 			
 			if (gl1.Count > 0){//na cukr je přímo navázaná AMK
 				/*
-                    zápis .pdb motivu do kategorie jednoduché glykosilace
+                    zápis .pdb motivu do kategorie jednoduché glykosylace
                     zápis textu + struktury motivu
                 */
 				writeGl1.Append(str.Id);
@@ -146,18 +145,23 @@ void Main()
                 */
 				for (int i = 1; i < 100; i++){
 					var countOfGlycosilation = 0;
-					var testBuilderAA = new StringBuilder();//test, jestli v aktuálním řetězci existuje spojení s AMK
+					/*var testBuilderAA = new StringBuilder();//test, jestli v aktuálním řetězci existuje spojení s AMK
 					testBuilderAA.Append(deepSearch.ToString());
 					testBuilderAA.Append(", AminoAcids())");
 					
-					var testQueryAA = PythonEngine.GetQuery(testBuilderAA.ToString());
+					var testQueryAA = PythonEngine.GetQuery(testBuilderAA.ToString());*/
+					var testQueryAA1 = QueryBuilder.ResidueIds(String.Format("{0}",resID)).ConnectedResidues(i+1).Filter(m => QueryBuilder.Count(m, QueryBuilder.AminoAcids())>0);
+					var testQueryAA = testQueryAA1.ToMetaQuery().Compile();
 					var glTestAA = testQueryAA.Matches(str);//testuju, jestli je motiv v PŮVODNÍ struktuře (motiv může být delší než okolí 5A) 
                                                                 //=> teoreticky to může vytvořit duplicitu
 					
-					var testBuilder = new StringBuilder();//test, jestli existuje oligosacharid
+					/* var testBuilder = new StringBuilder();//test, jestli existuje oligosacharid
 					testBuilder.Append(deepSearch.ToString());
 					testBuilder.Append(")");
-					var testQuery = PythonEngine.GetQuery(testBuilder.ToString());
+					var testQuery = PythonEngine.GetQuery(testBuilder.ToString());*/
+					var testQuery1 = QueryBuilder.ResidueIds(String.Format("{0}",resID)).ConnectedResidues(i+1).Filter(m => QueryBuilder.Count(m, QueryBuilder.HetResidues())>i);
+					var testQuery = testQuery1.ToMetaQuery().Compile();
+
 					var glTest = testQuery.Matches(str); //znovu testuju v PŮVODNÍ struktuře (ne  ve struktuře nalezeného motivu)
 					
 					if (glTest.Count == 0 && i == 1){//na cukr není navázaný žádný další cukr (dál už nehledám)
@@ -185,7 +189,7 @@ void Main()
 					}else if (glTest.Count > 0 && glTestAA.Count == 0){//existuje oligosacharid, ale ještě jsme nenašli, jestli je navázaný na AMK NEBO je to jen ligand!!!
 						deepSearch.Append(", HetResidues()");
 						
-						var connection2 = new StringBuilder(); //test, jestli tam opravdu není vazba na AMK (test pomocí AmbientResidues)
+						//var connection2 = new StringBuilder(); //test, jestli tam opravdu není vazba na AMK (test pomocí AmbientResidues)
 						
                         //procházení motivů, které obsahují řetězec HetResiduí začínající cukrem
 						foreach (var motive in glTest){
@@ -193,10 +197,12 @@ void Main()
                                 test přítomnosti vazby pomocí Ambient Residues (důsledek častých chyb v PDB databázi)
                              */
 							var rID = motive.Atoms.Last().ResidueIdentifier();//ID posledního residua v motivu
-							connection2.Append("ResidueIds(\"");
+							/*connection2.Append("ResidueIds(\"");
 							connection2.Append(rID);
 							connection2.Append("\").AmbientResidues(1.5).Filter(lambda m: m.Count(AminoAcids())>0)");
-							var connectionQuery = PythonEngine.GetQuery(connection2.ToString());
+							var connectionQuery = PythonEngine.GetQuery(connection2.ToString());*/
+							var connection2 = QueryBuilder.ResidueIds(String.Format("{0}",rID)).AmbientResidues(1.5).Filter(m => QueryBuilder.Count(m, QueryBuilder.AminoAcids())>0);
+							var connectionQuery = testQueryAA1.ToMetaQuery().Compile();
 							var cQ = connectionQuery.Matches(str);
 							if (cQ.Count > 0){ //motiv měl být v kategorii glykosylace, ale nenašla jsem ho kvůli chybě v PDB databáze
                                 /*
@@ -215,7 +221,7 @@ void Main()
 								zapisGlykosilace.Add(writeGlycosilation.ToString());
 								gl = true;
 							}
-							connection2 = new StringBuilder();
+							//connection2 = new StringBuilder();
 						}
 					}else if (glTest.Count > 0 && glTestAA.Count > 0){//našla jsem glykosylaci oligosacharidu, ale hledám dál, jestli nenajdu větší
                         /*

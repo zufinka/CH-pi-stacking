@@ -59,7 +59,7 @@ void Main()
             projdu případy, kdy se našly motivy s aromatickou amk v blízkosti cukru
             aromatická amk bude nalezená vždy!!!
          */
-        var pocetAtomuJedneAMK = 3;
+        var pocetAtomuJedneAMK = 2;
 		var pocetAtomuAMK = pocetAtomuJedneAMK; 
 		if (sorted.Count > pocetAtomuAMK) //závisí na počtu atomů arom. residua, které ukládám
 		{	
